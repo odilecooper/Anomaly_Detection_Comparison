@@ -24,9 +24,7 @@ def train_and_evaluate_SPE(X_train, X_test, y_train, y_test, random_state):
     y_pred = clf.predict(X_test)
     aucroc = roc_auc_score(y_test, y_pred)
     score = average_precision_score(y_test, y_pred)
-    print ("SelfPacedEnsemble {} | AUCROC: {:.3f} | AUPRC: {:.3f} | #Training Samples: {:d}".format(
-        len(clf.estimators_), aucroc, score, sum(clf.estimators_n_training_samples_)
-        ))
+    return aucroc, score
 
 def read_data(args):
     print("Reading data...")
@@ -47,16 +45,31 @@ def read_data(args):
 def main(args):
     X_train, X_test, y_train, y_test = read_data(args)
     print("===SPE===")
-    train_and_evaluate_SPE(X_train, X_test, y_train, y_test, args.random_seed)
-
+    aucroc = np.zeros(args.runs)
+    auprc = np.zeros(args.runs)  
+    for run in range(args.runs):
+        print("run: ", run)
+        aucroc[run], auprc[run] = train_and_evaluate_SPE(X_train, X_test, y_train, y_test, args.random_seed)
+        print("AUCROC: %.4f | AUPRC: %.4f " % (aucroc[run], auprc[run]))
+    mean_aucroc = np.mean(aucroc)
+    mean_auprc = np.mean(auprc)
+    print("average AUC-ROC: %.4f, average AUC-PR: %.4f" % (mean_aucroc, mean_auprc))   
+    
     print("==contrastive===")
-    # TODO: only use normal sample in training
-    contrastive_trainer_object=ContrastiveTrainer(batch_size=1024, device=device, faster_version=False)
-    f_score, aucroc, auprc = contrastive_trainer_object.train_and_evaluate(X_train, X_test, y_test)
-    print ("F1: {:.3f} | AUCROC: {:.3f} | AUPRC: {:.3f} ".format(f_score, aucroc, auprc))
+    aucroc = np.zeros(args.runs)
+    auprc = np.zeros(args.runs)  
+    for run in range(args.runs):
+        print("run: ", run)
+        contrastive_trainer_object=ContrastiveTrainer(batch_size=512, device=device, faster_version=False)
+        f_score, aucroc[run], auprc[run] = contrastive_trainer_object.train_and_evaluate(X_train, X_test, y_test)
+        print("AUCROC: %.4f | AUPRC: %.4f " % (aucroc[run], auprc[run]))
+    mean_aucroc = np.mean(aucroc)
+    mean_auprc = np.mean(auprc)
+    print("average AUC-ROC: %.4f, average AUC-PR: %.4f" % (mean_aucroc, mean_auprc))   
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--use_normalised", action='store_true', help="use normalised data or not")
 parser.add_argument("--random_seed", type=int, default=42, help="the random seed number")
+parser.add_argument("--runs", type=int, default=1)
 args = parser.parse_args()
 main(args)
